@@ -1,0 +1,18 @@
+endpoints:
+  identity:
+    auth:
+      admin:
+        region_name: RegionOne
+        username: admin
+        password: password
+        project_name: admin
+        user_domain_name: default
+        project_domain_name: default
+      tempest:
+        role: admin
+        region_name: RegionOne
+        username: tempest
+        password: password
+        project_name: service
+        user_domain_name: default
+        project_domain_name: default

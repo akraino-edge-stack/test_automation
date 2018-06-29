@@ -1,0 +1,277 @@
+# Copyright 2017 The Openstack-Helm Authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+labels:
+  job:
+    node_selector_key: openstack-control-plane
+    node_selector_value: enabled
+
+images:
+  tags:
+    dep_check: quay.io/stackanetes/kubernetes-entrypoint:v0.2.1
+    tempest_run_tests: docker.io/kolla/ubuntu-source-tempest:ocata
+    ks_user: docker.io/openstackhelm/heat:ocata
+    image_repo_sync: docker.io/docker:17.07.0
+  pull_policy: "IfNotPresent"
+  local_registry:
+    active: false
+    exclude:
+      - dep_check
+      - image_repo_sync
+
+pod:
+  user:
+    tempest:
+      uid: 1000
+  resources:
+    enabled: false
+    jobs:
+      ks_user:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+      run_tests:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+      image_repo_sync:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "1024Mi"
+          cpu: "2000m"
+
+dependencies:
+  dynamic:
+    common:
+      local_image_registry:
+        jobs:
+          - tempest-image-repo-sync
+        services:
+          - endpoint: node
+            service: local_image_registry
+  static:
+    ks_user:
+      services:
+      - service: identity
+        endpoint: internal
+    run_tests:
+      jobs:
+      - tempest-ks-user
+      services:
+      - service: identity
+        endpoint: internal
+    image_repo_sync:
+      services:
+        - endpoint: internal
+          service: local_image_registry
+
+conf:
+  script: |
+    #sleep 6d
+    #ostestr --regex '(.*smoke)'
+    #tempest run --smoke  || echo "Error $? running tempest"
+    tempest run --blacklist-file /etc/tempest/test-blacklist || echo "Error $? running tempest"
+  # The following sections can be used to blacklist and whitelist specific tests.
+  # If either section is not empty, it will be used to create an entry in the
+  # tempest-etc configmap and will be mounted into the tempest-run-tests pod
+  blacklist:
+    - (?:tempest\.api\.image\.v1\.test_images\.CreateRegisterImagesTest\.test_register_then_upload)
+    - (?:tempest\.api\.image\.v2\.test_images_metadefs_namespaces\.MetadataNamespacesTest\.test_basic_metadata_definition_namespaces)
+    - (?:tempest\.api\.image\.v2\.test_images_metadefs_resource_types\.MetadataResourceTypesTest\.test_basic_meta_def_resource_type_association)
+    - (?:tempest\.api\.image\.v2\.test_images_metadefs_namespace_properties\.MetadataNamespacePropertiesTest\.test_basic_meta_def_namespace_property)
+    - (?:tempest\.api\.volume\.admin\.test_volume_types\.VolumeTypesV2Test\.test_volume_crud_with_volume_type_and_extra_specs)
+    - (?:tempest\.api\.image\.v1\.test_image_members_negative\.ImageMembersNegativeTest\.test_get_image_without_membership)
+    - (?:tempest\.api\.volume\.v2\.test_image_metadata\.VolumesV2ImageMetadata)
+    - (?:tempest\.api\.volume\.v2\.test_volumes_list\.VolumesV2ListTestJSON\.test_volume_list_details_pagination)
+    - (?:tempest\.api\.volume\.v2\.test_volumes_list\.VolumesV2ListTestJSON\.test_volume_list_pagination)
+    - (?:tempest\.api\.image\.v2\.test_images_member_negative\.ImagesMemberNegativeTest\.test_image_share_owner_cannot_accept)
+    - (?:tempest\.api\.image\.v2\.test_images_member\.ImagesMemberTest\.test_get_private_image)
+    - (?:tempest\.api\.image\.v2\.test_images_member\.ImagesMemberTest\.test_image_share_accept)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_projects_negative\.ProjectsNegativeTestJSON\.test_create_project_by_unauthorized_user)
+    - (?:tempest\.api\.image\.v2\.test_images\.ListSharedImagesTest\.test_list_images_param_member_status)
+    - (?:tempest\.api\.image\.v2\.test_images_member\.ImagesMemberTest\.test_image_share_reject)
+    - (?:tempest\.api\.image\.v2\.test_images_member\.ImagesMemberTest\.test_remove_image_member)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_projects_negative\.ProjectsNegativeTestJSON\.test_list_projects_by_unauthorized_user)
+    - (?:tempest\.api\.image\.v1\.test_image_members\.ImageMembersTest\.test_remove_member)
+    - (?:tempest\.api\.volume\.admin\.test_volume_types_negative\.VolumeTypesNegativeV2Test\.test_create_volume_with_private_volume_type)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_projects_negative\.ProjectsNegativeTestJSON\.test_project_delete_by_unauthorized_user)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_groups\.GroupsV3TestJSON\.test_list_groups)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_list_users\.UsersV3TestJSON\.test_list_users)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_list_users\.UsersV3TestJSON\.test_list_users_with_name)
+    - (?:tempest\.api\.identity\.admin\.v3\.test_endpoints\.EndPointsTestJSON\.test_update_endpoint)
+    - (?:tempest\.api\.volume\.test_volumes_clone\.VolumesV2CloneTest\.test_create_from_bootable_volume)
+    - (?:tempest\.api\.volume\.test_volumes_get\.VolumesV2GetTest\.test_volume_create_get_update_delete_from_image)
+    - (?:tempest\.api\.volume\.test_volumes_backup\.VolumesBackupsV2Test\.test_bootable_volume_backup_and_restore)
+    - (?:tempest\.api\.volume\.test_volumes_backup\.VolumesBackupsV2Test\.test_volume_backup_create_get_detailed_list_restore_delete)
+    - (?:tempest\.api\.volume\.admin\.v2\.test_volume_type_access\.VolumeTypesAccessV2Test\.test_volume_type_access_add)
+    - (?:tempest\.api\.volume\.admin\.test_volumes_backup\.VolumesBackupsAdminV2Test\.test_volume_backup_export_import)
+    - (?:tempest\.api\.volume\.admin\.test_volumes_backup\.VolumesBackupsAdminV2Test\.test_volume_backup_reset_status)
+  # whitelist:
+  #   - (?:tempest\.api\..*)
+  #   - (?:tempest\.api\.identity\.admin\.v3\.test_groups\.GroupsV3TestJSON\.test_list_groups)
+  #   - (?:tempest\.scenario\.test_network_basic_ops\.TestNetworkBasicOps\.test_update_instance_port_admin_state)
+  tempest:
+    auth:
+      use_dynamic_credentials: true
+      admin_domain_scope: true
+      tempest_roles: admin, _member_
+      min_compute_nodes: 1
+    identity:
+      auth_version: v3
+    identity-feature-enabled:
+      api_v2: false
+      api_v3: true
+    image:
+      http_image: "http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img"
+      container_formats: bare
+      disk_formats: raw
+    network:
+      dns_servers: 10.96.0.10
+      project_networks_reachable: false
+      shared_physical_network: true
+    network-feature-enabled:
+      floating_ips: true
+      api_extensions:
+        - default-subnetpools
+        - network-ip-availability
+        - network_availability_zone
+        - auto-allocated-topology
+        - ext-gw-mode
+        - binding
+        - agent
+        - subnet_allocation
+        - l3_agent_scheduler
+        - tag
+        - external-net
+        - flavors
+        - net-mtu
+        - availability_zone
+        - quotas
+        - l3-ha
+        - provider
+        - multi-provider
+        - address-scope
+        - extraroute
+        - subnet-service-types
+        - standard-attr-timestamp
+        - service-type
+        - l3-flavors
+        - port-security
+        - extra_dhcp_opt
+        - standard-attr-revisions
+        - pagination
+        - sorting
+        - security-group
+        - dhcp_agent_scheduler
+        - router_availability_zone
+        - rbac-policies
+        - standard-attr-description
+        - router
+        - allowed-address-pairs
+        - project-id
+        - dvr
+    service_available:
+      cinder: true
+      glance: true
+      # The following services are marked as unavailable by default. The default
+      # tempest image used includes a bug resulting in failed network tests that
+      # wasn't fixed in newton. Swift is disabled by default as the swift chart
+      # isn't complete
+      neutron: false
+      nova: false
+      swift: false
+    validation:
+      connect_method: floating
+    volume:
+      disk_formats: raw
+      backend_name: rbd1
+      storage_protocol: rbd
+    volume-feature-enabled:
+      api_v1: False
+      api_v3: True
+
+pvc:
+  enabled: false
+  name: pvc-tempest
+  requests:
+    storage: 2Gi
+  storage_class: general
+
+secrets:
+  identity:
+    admin: tempest-keystone-admin
+    tempest: tempest-keystone-user
+
+endpoints:
+  cluster_domain_suffix: cluster.local
+  local_image_registry:
+    name: docker-registry
+    namespace: docker-registry
+    hosts:
+      default: localhost
+      internal: docker-registry
+      node: localhost
+    host_fqdn_override:
+      default: null
+    port:
+      registry:
+        node: 5000
+  identity:
+    name: keystone
+    auth:
+      admin:
+        region_name: RegionOne
+        username: admin
+        password: password
+        project_name: admin
+        user_domain_name: default
+        project_domain_name: default
+      tempest:
+        role: admin
+        region_name: RegionOne
+        username: tempest
+        password: password
+        project_name: service
+        user_domain_name: default
+        project_domain_name: default
+    hosts:
+      default: keystone-api
+      public: keystone
+    host_fqdn_override:
+      default: null
+    path:
+      default: /v3
+    scheme:
+      default: http
+    port:
+      admin:
+        default: 35357
+      api:
+        default: 80
+
+manifests:
+  configmap_bin: true
+  configmap_etc: true
+  job_image_repo_sync: true
+  job_ks_user: true
+  job_run_tests: true
+  secret_keystone: true
