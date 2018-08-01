@@ -18,11 +18,26 @@ set -e
 # Define variables
 COMMAND='openstack'
 OPENSTACK_CLI_IMAGE="${OPENSTACK_CLI_IMAGE:-docker.io/openstackhelm/heat:newton}"
+NAMESPACE="${NAMESPACE:-openstack}"
 
-# Get the path of the directory where the script is located
-# Source Base Docker Command
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-cd ${DIR} && source openstack_cli_docker_base_command.sh
+# Define Base Docker Command
+base_docker_command=$(cat << EndOfCommand
+sudo docker run -t --rm --net=host
+-e http_proxy=${HTTP_PROXY}
+-e https_proxy=${HTTPS_PROXY}
+-e OS_AUTH_URL=${OS_AUTH_URL:-http://keystone.${NAMESPACE}.svc.cluster.local:80/v3}
+-e OS_USERNAME=${OS_USERNAME:-admin}
+-e OS_USER_DOMAIN_NAME=${OS_USER_DOMAIN_NAME:-default}
+-e OS_PASSWORD=${OS_PASSWORD:-password}
+-e OS_PROJECT_DOMAIN_NAME=${OS_PROJECT_DOMAIN_NAME:-default}
+-e OS_PROJECT_NAME=${OS_PROJECT_NAME:-admin}
+-e OS_REGION_NAME=${OS_REGION_NAME:-RegionOne}
+-e OS_IDENTITY_API_VERSION=${OS_IDENTITY_API_VERSION:-3}
+-w /host/$(pwd)
+-v /:/host:rshared
+EndOfCommand
+)
 
 # Execute OpenStack CLI
 ${base_docker_command} ${OPENSTACK_CLI_IMAGE} ${COMMAND} $@
+
